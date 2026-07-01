@@ -106,7 +106,8 @@ npm run build   # 타입체크 + 빌드
 | DELETE | `/api/tasks/:id` | ~15% 500 |
 
 - **낙관적 동시성**: 태스크마다 `version`(정수)이 있고, `PATCH`는 이 값을 함께 보냅니다. 서버 값과 다르면 **409**. `src/api/client.ts`의 `ApiError.payload.current`로 서버 최신 상태를 읽을 수 있습니다.
-- ⚠️ **mock API를 우회해 localStorage로 대체 금지**(비동기 처리가 과제 본질). 다중 탭 동기화 등 부가 용도의 localStorage는 무방.
+- **서버는 실제 백엔드가 아니라 브라우저에서 도는 MSW 가짜 서버**입니다. 별도 서버 개발 없이, 제공된 `updateTask()` 등 API 함수만 호출하면 됩니다. 이 가짜 서버는 내부적으로 localStorage를 DB로 써서 **새로고침해도 데이터가 유지**됩니다. 초기 시드로 되돌리려면 콘솔에서 **`resetMockDb()`** 호출.
+- ⚠️ 위 localStorage는 *가짜 서버의 DB*입니다. **지원자가 앱 상태를 localStorage로 직접 저장해 mock API를 우회하는 것은 금지**(비동기 처리가 과제 본질). 다중 탭 동기화 등 부가 용도는 무방.
 
 ```ts
 type Task = {

@@ -1,15 +1,12 @@
 import { http, HttpResponse, delay } from 'msw'
 import type { Task } from '../types'
-import { generateSeedTasks } from './seed'
+import { getStore, setStore } from './db'
 import {
   WRITE_FAILURE_RATE,
   READ_FAILURE_RATE,
   MIN_LATENCY,
   MAX_LATENCY,
 } from './config'
-
-// 세션 동안 유지되는 인메모리 저장소. 새로고침하면 시드로 초기화됩니다.
-let store: Task[] = generateSeedTasks()
 
 const randInt = (min: number, max: number) =>
   Math.floor(Math.random() * (max - min + 1)) + min
@@ -27,7 +24,7 @@ export const handlers = [
   http.get('*/api/tasks', async () => {
     await latency()
     if (Math.random() < READ_FAILURE_RATE) return serverError()
-    return HttpResponse.json(store)
+    return HttpResponse.json(getStore())
   }),
 
   // 생성
@@ -49,7 +46,7 @@ export const handlers = [
       updatedAt: now,
       version: 1,
     }
-    store = [task, ...store]
+    setStore([task, ...getStore()])
     return HttpResponse.json(task, { status: 201 })
   }),
 
@@ -60,6 +57,7 @@ export const handlers = [
 
     const id = params.id as string
     const body = (await request.json()) as Partial<Task> & { version?: number }
+    const store = getStore()
     const idx = store.findIndex((t) => t.id === id)
     if (idx === -1) {
       return HttpResponse.json({ message: '태스크를 찾을 수 없습니다.' }, { status: 404 })
@@ -82,7 +80,9 @@ export const handlers = [
       updatedAt: new Date().toISOString(),
       version: current.version + 1,
     }
-    store[idx] = updated
+    const next = store.slice()
+    next[idx] = updated
+    setStore(next)
     return HttpResponse.json(updated)
   }),
 
@@ -92,7 +92,7 @@ export const handlers = [
     if (Math.random() < WRITE_FAILURE_RATE) return serverError()
 
     const id = params.id as string
-    store = store.filter((t) => t.id !== id)
+    setStore(getStore().filter((t) => t.id !== id))
     return new HttpResponse(null, { status: 204 })
   }),
 ]
