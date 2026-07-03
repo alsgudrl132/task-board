@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Task, Status } from "./types";
-import { getTasks } from "./api/client";
+import { getTasks, updateTask } from "./api/client";
 import { Column } from "./components/Column";
 
 const COLUMNS: { status: Status; title: string }[] = [
@@ -8,7 +8,6 @@ const COLUMNS: { status: Status; title: string }[] = [
   { status: "in-progress", title: "In Progress" },
   { status: "done", title: "Done" },
 ];
-
 type LoadState = "loading" | "error" | "success";
 
 export default function Board() {
@@ -18,10 +17,10 @@ export default function Board() {
   useEffect(() => {
     // 순진한 초기 로드: 로딩만 처리합니다.
     // TODO(P1): 에러 상태 + 재시도, 빈 상태 처리를 구현하세요.
-    loadTasks();
+    loadingTask();
   }, []);
 
-  const loadTasks = () => {
+  const loadingTask = () => {
     setLoadState("loading");
     getTasks()
       .then((data) => {
@@ -38,8 +37,26 @@ export default function Board() {
   //   - updateTask(id, { status, version }) 로 서버에 반영
   //   - 실패(15%)하면 이전 상태로 되돌리고 사용자에게 알림
   //   - 같은 카드를 빠르게 연속 이동해도 최종 상태가 서버와 일치하도록
+  // const moveTask = (id: string, status: Status) => {
+  //   setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
+  //   console.log("변경");
+  // };
+
   const moveTask = (id: string, status: Status) => {
+    const snapshot = tasks.find((task) => task.id === id);
+    if (!snapshot) return;
+
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
+
+    updateTask(id, { status, version: snapshot.version })
+      .then((updated) => {
+        setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+        console.log("업데이트 성공");
+      })
+      .catch(() => {
+        setTasks((prev) => prev.map((t) => (t.id === id ? snapshot : t)));
+        alert("이동에 실패하였습니다. 이전상태로 되돌립니다.");
+      });
   };
 
   const byStatus = useMemo(() => {
@@ -52,15 +69,15 @@ export default function Board() {
     return map;
   }, [tasks]);
 
-  if (loadState === "loading") return <p className="hint">불러오는 중…</p>;
-  if (loadState === "error")
+  if (loadState == "loading") return <p className="hint">불러오는 중…</p>;
+  if (loadState == "error")
     return (
       <div>
         <p className="hint">불러오기에 실패하였습니다.</p>
-        <button onClick={loadTasks}>재시도</button>
+        <button onClick={() => loadingTask()}>재시도</button>
       </div>
     );
-  if (tasks.length === 0) return <p className="hint">태스크가 없습니다.</p>;
+  if (tasks.length === 0) return <p>태스크가 없습니다.</p>;
 
   return (
     <div className="board">
