@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import type { Task, Status } from "./types";
 import { getTasks, updateTask } from "./api/client";
 import { Column } from "./components/Column";
+import { TaskModal } from "./components/TaskModal";
+import { DeleteDialog } from "./components/DeleteDialog";
 
 const COLUMNS: { status: Status; title: string }[] = [
   { status: "todo", title: "To Do" },
@@ -10,9 +12,16 @@ const COLUMNS: { status: Status; title: string }[] = [
 ];
 type LoadState = "loading" | "error" | "success";
 
+type ModalState =
+  | { type: "none" }
+  | { type: "create" }
+  | { type: "edit"; task: Task }
+  | { type: "delete"; task: Task };
+
 export default function Board() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [modal, setModal] = useState<ModalState>({ type: "none" });
 
   // 리렌더링 없이 항상 최신 tasks를 읽기 위한 ref
   const tasksRef = useRef<Task[]>([]);
@@ -24,8 +33,6 @@ export default function Board() {
   tasksRef.current = tasks;
 
   useEffect(() => {
-    // 순진한 초기 로드: 로딩만 처리합니다.
-    // TODO(P1): 에러 상태 + 재시도, 빈 상태 처리를 구현하세요.
     loadingTask();
   }, []);
 
@@ -42,11 +49,6 @@ export default function Board() {
       });
   };
 
-  // ⚠️ 서버에 저장하지 않고 로컬 상태만 바꾸는 "순진한" 이동입니다.
-  // TODO(P1): 낙관적 업데이트 + 실패 시 롤백 + 경쟁 상태 처리를 구현하세요.
-  //   - updateTask(id, { status, version }) 로 서버에 반영
-  //   - 실패(15%)하면 이전 상태로 되돌리고 사용자에게 알림
-  //   - 같은 카드를 빠르게 연속 이동해도 최종 상태가 서버와 일치하도록
   const moveTask = (id: string, status: Status) => {
     // 1. 화면 즉시 변경 + tasksRef 동시 업데이트
     setTasks((prev) => {
@@ -60,13 +62,11 @@ export default function Board() {
 
     // 3. 이전 요청 끝나면 실행
     const currRequest = prevRequest.then(() => {
-      // 큐 실행 시점의 최신 version 읽기
       const currentTask = tasksRef.current.find((t) => t.id === id);
       if (!currentTask) return;
 
       return updateTask(id, { status, version: currentTask.version })
         .then((serverTask) => {
-          // 성공: 서버 확인 상태 저장 + version 동기화
           savedTasksRef.current.set(id, serverTask);
           tasksRef.current = tasksRef.current.map((t) =>
             t.id === id ? serverTask : t,
@@ -74,7 +74,6 @@ export default function Board() {
           setTasks(tasksRef.current);
         })
         .catch(() => {
-          // 실패: 마지막 서버 확인 상태로 롤백
           const rollbackTask = savedTasksRef.current.get(id);
           if (rollbackTask) {
             tasksRef.current = tasksRef.current.map((t) =>
@@ -91,6 +90,21 @@ export default function Board() {
       id,
       currRequest.catch(() => {}),
     );
+  };
+
+  // TODO: createTask API 호출 + 낙관적 업데이트 구현
+  const handleCreate = (data: Partial<Task>) => {
+    setModal({ type: "none" });
+  };
+
+  // TODO: updateTask API 호출 + 낙관적 업데이트 구현
+  const handleEdit = (data: Partial<Task>) => {
+    setModal({ type: "none" });
+  };
+
+  // TODO: deleteTask API 호출 + 낙관적 삭제 구현
+  const handleDelete = () => {
+    setModal({ type: "none" });
   };
 
   const byStatus = useMemo(() => {
@@ -114,16 +128,51 @@ export default function Board() {
   if (tasks.length === 0) return <p>태스크가 없습니다.</p>;
 
   return (
-    <div className="board">
-      {COLUMNS.map((col) => (
-        <Column
-          key={col.status}
-          title={col.title}
-          status={col.status}
-          tasks={byStatus[col.status]}
-          onMove={moveTask}
+    <>
+      <div className="board-toolbar">
+        <button
+          className="btn btn-primary"
+          onClick={() => setModal({ type: "create" })}
+        >
+          + 태스크 추가
+        </button>
+      </div>
+      <div className="board">
+        {COLUMNS.map((col) => (
+          <Column
+            key={col.status}
+            title={col.title}
+            status={col.status}
+            tasks={byStatus[col.status]}
+            onMove={moveTask}
+            onEdit={(task) => setModal({ type: "edit", task })}
+            onDelete={(task) => setModal({ type: "delete", task })}
+          />
+        ))}
+      </div>
+
+      {modal.type === "create" && (
+        <TaskModal
+          mode="create"
+          onSubmit={handleCreate}
+          onClose={() => setModal({ type: "none" })}
         />
-      ))}
-    </div>
+      )}
+      {modal.type === "edit" && (
+        <TaskModal
+          mode="edit"
+          task={modal.task}
+          onSubmit={handleEdit}
+          onClose={() => setModal({ type: "none" })}
+        />
+      )}
+      {modal.type === "delete" && (
+        <DeleteDialog
+          task={modal.task}
+          onConfirm={handleDelete}
+          onCancel={() => setModal({ type: "none" })}
+        />
+      )}
+    </>
   );
 }
