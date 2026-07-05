@@ -15,6 +15,10 @@
 - 시작점(baseline) 데모: **https://kimxmfldh.github.io/task-board-assignment/**
 - 이 데모는 일부러 미완성 상태입니다. 5,000개가 그대로 렌더되어 버벅이고, 드래그해도 저장되지 않습니다.
 
+## 배포 URL
+
+**https://alsgudrl132.github.io/task-board/**
+
 ## 개발 기간
 
 - **3일 (72시간)**
@@ -141,6 +145,36 @@ type Task = {
   version: number         // 낙관적 동시성 제어용
 }
 ```
+
+## 구현 현황
+
+### Priority 1 — 완료
+
+| 기능 | 상태 | 비고 |
+|------|------|------|
+| 로드 상태 처리 (로딩/에러/재시도) | 완료 | |
+| 낙관적 업데이트 & 실패 롤백 | 완료 | 이동·수정·삭제·생성 전체 |
+| 경쟁 상태 처리 | 완료 | task별 Promise 큐로 직렬화 |
+| 대량 데이터 성능 (5,000개) | 완료 | @tanstack/react-virtual 가상 스크롤 |
+| 태스크 CRUD | 완료 | 추가·수정·삭제(확인 다이얼로그) |
+| 핵심 로직 유닛 테스트 | 완료 | moveTask·rollback·groupByStatus·filterByTitle |
+
+### Priority 2 — 미구현
+
+| 기능 | 미구현 사유 |
+|------|-------------|
+| 409 충돌 처리 UX | 시간 제약. 현재는 일반 실패와 동일하게 롤백 처리 |
+| 실패 요청 자동 재시도 | 수동 재시도 정책 채택 (DECISIONS.md 참고) |
+| 검색·필터 | 시간 제약 |
+| 다중 탭 동기화 | 시간 제약 |
+| 키보드 접근성 | 시간 제약 |
+
+## 사용 기술 스택
+
+- React 18, TypeScript (strict)
+- Vite, Vitest
+- @tanstack/react-virtual (가상 스크롤)
+- MSW (Mock Service Worker)
 
 ## 실행 방법
 
