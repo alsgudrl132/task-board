@@ -68,8 +68,9 @@ export default function Board() {
       return updateTask(id, { status, version: currentTask.version })
         .then((serverTask) => {
           savedTasksRef.current.set(id, serverTask);
+          // status는 현재 낙관적 상태 유지, version만 서버 값으로 동기화
           tasksRef.current = tasksRef.current.map((t) =>
-            t.id === id ? serverTask : t,
+            t.id === id ? { ...t, version: serverTask.version } : t,
           );
           setTasks(tasksRef.current);
         })
