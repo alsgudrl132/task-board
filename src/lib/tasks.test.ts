@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { moveTask, filterByTitle } from './tasks'
+import { moveTask, filterByTitle, rollback, groupByStatus } from './tasks'
 import type { Task } from '../types'
 
 const make = (id: string, over: Partial<Task> = {}): Task => ({
@@ -38,5 +38,51 @@ describe('filterByTitle', () => {
   it('빈 검색어면 전체를 반환한다', () => {
     const tasks = [make('a'), make('b')]
     expect(filterByTitle(tasks, '   ')).toHaveLength(2)
+  })
+})
+
+describe('rollback', () => {
+  it('실패한 태스크를 원래 상태로 되돌린다', () => {
+    const original = make('a', { status: 'todo' })
+    const tasks = [make('a', { status: 'done' }), make('b')]
+
+    const result = rollback(tasks, original)
+
+    expect(result.find((t) => t.id === 'a')?.status).toBe('todo')
+  })
+
+  it('롤백 대상 외 나머지는 건드리지 않는다', () => {
+    const original = make('a', { status: 'todo' })
+    const tasks = [make('a', { status: 'done' }), make('b', { status: 'in-progress' })]
+
+    const result = rollback(tasks, original)
+
+    expect(result.find((t) => t.id === 'b')?.status).toBe('in-progress')
+  })
+})
+
+describe('groupByStatus', () => {
+  it('각 태스크를 status에 맞는 그룹에 넣는다', () => {
+    const tasks = [
+      make('a', { status: 'todo' }),
+      make('b', { status: 'in-progress' }),
+      make('c', { status: 'done' }),
+      make('d', { status: 'done' }),
+    ]
+
+    const result = groupByStatus(tasks)
+
+    expect(result.todo).toHaveLength(1)
+    expect(result['in-progress']).toHaveLength(1)
+    expect(result.done).toHaveLength(2)
+  })
+
+  it('해당 status 태스크가 없으면 빈 배열을 반환한다', () => {
+    const tasks = [make('a', { status: 'todo' })]
+
+    const result = groupByStatus(tasks)
+
+    expect(result['in-progress']).toHaveLength(0)
+    expect(result.done).toHaveLength(0)
   })
 })

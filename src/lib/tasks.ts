@@ -13,3 +13,13 @@ export function filterByTitle(tasks: Task[], query: string): Task[] {
   if (!q) return tasks
   return tasks.filter((t) => t.title.toLowerCase().includes(q))
 }
+
+export function rollback(tasks: Task[], original: Task): Task[] {
+  return tasks.map((t) => (t.id === original.id ? original : t))
+}
+
+export function groupByStatus(tasks: Task[]): Record<Status, Task[]> {
+  const map: Record<Status, Task[]> = { todo: [], 'in-progress': [], done: [] }
+  for (const t of tasks) map[t.status].push(t)
+  return map
+}

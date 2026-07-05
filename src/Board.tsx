@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import type { Task, Status } from "./types";
-import { getTasks, updateTask } from "./api/client";
+import { createTask, deleteTask, getTasks, updateTask } from "./api/client";
 import { Column } from "./components/Column";
 import { TaskModal } from "./components/TaskModal";
 import { DeleteDialog } from "./components/DeleteDialog";
@@ -92,19 +92,85 @@ export default function Board() {
     );
   };
 
-  // TODO: createTask API 호출 + 낙관적 업데이트 구현
   const handleCreate = (data: Partial<Task>) => {
     setModal({ type: "none" });
+
+    // 1. 임시 ID로 화면에 먼저 추가
+    const tempId = `temp-${Date.now()}`;
+    const tempTask: Task = {
+      id: tempId,
+      status: "todo",
+      version: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      title: data.title!,
+      priority: data.priority ?? "medium",
+    };
+    tasksRef.current = [tempTask, ...tasksRef.current];
+    setTasks(tasksRef.current);
+
+    // 2. 서버 요청
+    createTask(data)
+      .then((serverTask) => {
+        // 성공: 임시 항목을 서버 데이터로 교체
+        tasksRef.current = tasksRef.current.map((t) =>
+          t.id === tempId ? serverTask : t,
+        );
+        setTasks(tasksRef.current);
+      })
+      .catch(() => {
+        // 3. 실패: 임시 항목 제거
+        tasksRef.current = tasksRef.current.filter((t) => t.id !== tempId);
+        setTasks(tasksRef.current);
+        alert("추가에 실패했습니다.");
+      });
   };
 
-  // TODO: updateTask API 호출 + 낙관적 업데이트 구현
   const handleEdit = (data: Partial<Task>) => {
+    if (modal.type !== "edit") return;
+    const target = modal.task; // 원본 태스크 먼저 저장
     setModal({ type: "none" });
+
+    // 낙관적 업데이트: 교체
+    tasksRef.current = tasksRef.current.map((t) =>
+      t.id === target.id ? { ...target, ...data } : t,
+    );
+    setTasks(tasksRef.current);
+
+    updateTask(target.id, { ...data, version: target.version })
+      .then((serverTask) => {
+        tasksRef.current = tasksRef.current.map((t) =>
+          t.id === serverTask.id ? serverTask : t,
+        );
+        setTasks(tasksRef.current);
+      })
+      .catch(() => {
+        // 실패: 원본으로 롤백
+        tasksRef.current = tasksRef.current.map((t) =>
+          t.id === target.id ? target : t,
+        );
+        setTasks(tasksRef.current);
+        alert("수정에 실패했습니다.");
+      });
   };
 
-  // TODO: deleteTask API 호출 + 낙관적 삭제 구현
   const handleDelete = () => {
+    if (modal.type !== "delete") return;
+    const target = modal.task;
     setModal({ type: "none" });
+
+    tasksRef.current = tasksRef.current.filter((t) => t.id !== target.id);
+    setTasks(tasksRef.current);
+
+    deleteTask(target.id)
+      .then(() => {
+        alert("삭제되었습니다.");
+      })
+      .catch(() => {
+        tasksRef.current = [target, ...tasksRef.current];
+        setTasks(tasksRef.current);
+        alert("삭제에 실패했습니다.");
+      });
   };
 
   const byStatus = useMemo(() => {
@@ -125,7 +191,6 @@ export default function Board() {
         <button onClick={() => loadingTask()}>재시도</button>
       </div>
     );
-  if (tasks.length === 0) return <p>태스크가 없습니다.</p>;
 
   return (
     <>
